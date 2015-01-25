@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="/static/site.css" />
+
+        <script src="/static/lib/jquery-2.1.3.js"></script>
+        <script src="/static/lib/underscore.js"></script>
+        <script src="/static/lib/backbone.js"></script>
+        <script src="/static/lib/simple_statistics.js"></script>
+
+        <script src="/static/mixins.js"></script>
+        <script src="/static/components.js"></script>
+        <script src="/static/flags.js"></script>
+        <script src="/static/data.js"></script>
+        <script src="/static/state.js"></script>
+        <script src="/static/app.js"></script>
+    </head>
+
+    <body>
+        <div class="container">
+            <div class="col-2">
+                <div id="app">
+                    <input id="text-filter" type="text" />
+                    <button id="qualified-only">Show Only Qualified Players</button>
+                    <table></table>
+                </div>
+            </div>
+
+            <div class="col-1">
+                <div id="components">
+                    <ul class="list-inline"></ul>
+                    <button>Update Weights and Measures</button>
+                </div>
+                
+            </div>
+
+        </div>
+    </body>
+</html>
