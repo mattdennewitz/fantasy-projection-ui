@@ -1,8 +1,5 @@
 /* toggle element for a single component */
 var ComponentView = Backbone.View.extend({
-    defaultEnabled: true,
-    defaultScored: false,
-
     template: _.template(
         '<li>'+
         '  <label>' +
@@ -10,10 +7,10 @@ var ComponentView = Backbone.View.extend({
         '  </label>' +
         '  <label>' +
         '    <input type="checkbox" data-type="scored" /> Score?' +
-        '    <input class="component-weight" type="number" value="<%= value %>" />' +
+        '    <input class="component-weight" data-type="points" type="number" value="<%= value %>" />' +
         '  </label>' +
         '  <label>' +
-        '    <input type="checkbox" data-type="enalbed" checked="checked" /> Display?' +
+        '    <input type="checkbox" data-type="enabled" <% if(enabled) { %>checked="checked"<% } %> /> Display?' +
         '  </label>' +
         '</li>'
     ),
@@ -21,9 +18,10 @@ var ComponentView = Backbone.View.extend({
     initialize: function(opts) {
         _(this).bindAll('render', 'onToggle');
 
-        this.parent = opts.parent;
         this.componentName = opts.componentName;
-        this.enabled = opts.enabled || this.defaultEnabled;
+        this.enabled = opts.enabled;
+        this.scored = false;
+        this.points = 1;
 
         this.render();
     },
@@ -34,16 +32,19 @@ var ComponentView = Backbone.View.extend({
         var el = this.template({
             name: this.componentName,
             label: label,
-            value: 1
+            value: 1,
+            enabled: this.enabled
         });
 
         this.setElement(el);
-        this.$el.on('click', 'input[type="checkbox"]', this.onToggle);
+        this.$el.on('change', this.onToggle);
         return this;
     },
 
     onToggle: function(evt) {
-        this.enabled = evt.target.checked;
+        this.enabled = this.$('[data-type="enabled"]').prop('checked');
+        this.scored = this.$('[data-type="scored"]').prop('checked');
+        this.points = this.$('[data-type="points"]').val();
     }
 });
 
@@ -63,22 +64,38 @@ var ComponentSelectionView = Backbone.View.extend({
     /* renders toggles for all components projected by the current system */
     render: function() {
         var system = projectionStore.get('currentSystem');
-        var fields = system.system.batting_fields;
+        var type = projectionStore.get('currentType');
+        var fields = system.system[type + '_fields'];
+        var selectedComponents = projectionStore.get('selectedComponents');
  
-        _(fields).each(function(component) {
-            var view = new ComponentView({componentName: component, parent: this});
+        _(fields).each(function(componentName, i) {
+            var view = new ComponentView({
+                componentName: componentName,
+                enabled: _(selectedComponents).contains(componentName)
+            });
+
+            this.$components.append(view.el);
             this.componentViews.push(view);
-            this.$components.append( view.el );
         }.bind(this));
     },
 
     /* informs global state of which components to display */
     onUpdateComponentInfo: function(component, state) {
-        var selectedComponents = projectionStore.get('selectedComponents');
+        var selectedComponents = [];
+        var scoredComponents = [];
+
         _(this.componentViews).each(function(view) {
-            selectedComponents[view.componentName] = view.enabled;
+            if(view.enabled)
+                selectedComponents.push(view.componentName);
+
+            if(view.scored)
+                scoredComponents.push(view.componentName);
         });
-        projectionStore.set({selectedComponents: selectedComponents});
+
+        projectionStore.set({
+            selectedComponents: selectedComponents,
+            scoredComponents: scoredComponents
+        });
     }
 });
 
@@ -101,7 +118,8 @@ var TableView = Backbone.View.extend({
         var system = projectionStore.get('currentSystem');
         var type = projectionStore.get('currentType');
         var selectedComponents = projectionStore.get('selectedComponents');
-        var qualifiedOnly = projectionStore.get('qualifiedOnly');
+        var scoredComponents = projectionStore.get('scoredComponents');
+        var projections = projectionStore.getProjections();
 
         /* remove table */
         var oldTable = this.el.getElementsByTagName('table')[0];
@@ -110,21 +128,24 @@ var TableView = Backbone.View.extend({
         /* create brand new table */
         var newTable = document.createElement('table');
 
-        /* which fields will we display? */
-        var typeFields = _(selectedComponents).keysWithValue(true);
-
         /* create header row */
         var headerRow = document.createElement('tr');
         var playerNameHeader = document.createElement('th');
         playerNameHeader.textContent = 'Player';
         headerRow.appendChild(playerNameHeader);
 
-        _(typeFields).each(function(componentName) {
-            var td = document.createElement('th');
-            var label = ComponentMap[projectionStore.get('currentType')][componentName].label;
-            td.textContent = label;
-            headerRow.appendChild(td);
+        _(selectedComponents).each(function(componentName) {
+            var th = document.createElement('th');
+            var label = ComponentMap[type][componentName].label;
+            th.textContent = label;
+            headerRow.appendChild(th);
         });
+
+        if(scoredComponents.length > 0) {
+            var zValueTh = document.createElement('th');
+            zValueTh.textContent = 'Value';
+            headerRow.appendChild(zValueTh);
+        }
 
         var thead = document.createElement('thead');
         thead.appendChild(headerRow);
@@ -133,10 +154,7 @@ var TableView = Backbone.View.extend({
         var tbody = document.createElement('tbody');
 
         /* create table body */
-        _(system.batting_projections).each(function(ppro) {
-            if(qualifiedOnly && ppro['s_pa'] < 100)
-                return false;
-
+        _(projections).each(function(ppro) {
             if(this.textFilter != ''
                && ppro.player.name.toLowerCase().indexOf(this.textFilter.toLowerCase()) == -1)
                 return false;
@@ -146,11 +164,17 @@ var TableView = Backbone.View.extend({
             playerNameEl.textContent = ppro.player.name;
             row.appendChild(playerNameEl);
 
-            _(typeFields).each(function(component) {
+            _(selectedComponents).each(function(component) {
                 var td = document.createElement('td');
                 td.textContent = ppro[component];
                 row.appendChild(td);
             });
+
+            if(scoredComponents.length > 0) {
+                var zValueTd = document.createElement('td');
+                zValueTd.textContent = ppro.zValue;
+                row.appendChild(zValueTd);
+            }
 
             tbody.appendChild(row);
         }.bind(this));

@@ -3,6 +3,23 @@ body {
     font-size: 13px;
 }
 
+table {
+    border-collapse: collapse;
+    border: solid 1px #ddd;
+}
+
+tr {
+    border-bottom: solid 1px #eee;
+}
+
+td, th {
+    padding: 2px 4px;
+}
+
+td {
+    text-align: right;
+}
+
 .list-inline {
     margin: 0;
     padding: 0;
